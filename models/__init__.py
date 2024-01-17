@@ -31,6 +31,7 @@ def build_model(config):
             n_layers=config.n_layers,
             n_classes=config.num_classes,
             channels=config.channels,
+            ssm_drop=config.ssm_drop,
         )
     elif config.name == "resnet":
         model = ResNet(

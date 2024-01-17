@@ -2,7 +2,7 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 
-from autoaugment import CIFAR10Policy
+from data.autoaugment import CIFAR10Policy
 
 
 def load_data(training_args):

@@ -205,7 +205,7 @@ def main():
             project=training_args.wandb_project,
             name=training_args.run_name,
             config=cfg,
-            notes=sum(p.numel() for p in model.parameters() if p.requires_grad),
+            notes=str(sum(p.numel() for p in model.parameters() if p.requires_grad)),
         )
 
     print(model_args)

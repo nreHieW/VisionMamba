@@ -115,6 +115,7 @@ class TrainingArgs:
     eval_batch_size: int = 2500
     seed: int = 1337
     log_interval: int = 10
+    autoaugment: bool = False
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     mixed_precision: bool = False
@@ -143,6 +144,7 @@ class TrainingArgs:
         base_str += f"Eval batch size: {self.eval_batch_size}\n\t"
         base_str += f"Seed: {self.seed}\n\t"
         base_str += f"Log interval: {self.log_interval}\n\t"
+        base_str += f"Autoaugment: {self.autoaugment}\n\t"
 
         return base_str
 
@@ -188,6 +190,7 @@ def parse_args() -> (ModelArgs, TrainingArgs):
     parser.add_argument("--eval-batch-size", type=int, default=2500)
     parser.add_argument("--seed", type=int, default=1337)
     parser.add_argument("--log-interval", type=int, default=10)
+    parser.add_argument("--autoaugment", action="store_true")
 
     parser.add_argument("--train-dtype", type=str, default="fp32")
     parser.add_argument("--mixed-precision", action="store_true")
@@ -209,6 +212,7 @@ def parse_args() -> (ModelArgs, TrainingArgs):
         attn_drop=args.attn_drop,
         proj_drop=args.proj_drop,
         mlp_drop=args.mlp_drop,
+        ssm_drop=args.ssm_drop,
         num_blocks=args.num_blocks,
         block_fn=args.block_fn,
         dimensions=args.dimensions,
@@ -235,6 +239,7 @@ def parse_args() -> (ModelArgs, TrainingArgs):
         train_dtype=args.train_dtype,
         mixed_precision=args.mixed_precision,
         save_path=args.save_path,
+        autoaugment=args.autoaugment,
     )
 
     return model_args, training_args

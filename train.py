@@ -2,14 +2,13 @@ import wandb
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torchvision
-import torchvision.transforms as transforms
 import os
 import yaml
 
 from torch.utils.data import DataLoader
 
 from models import build_model
+from data import load_data
 from args import parse_args, ModelArgs, TrainingArgs
 
 
@@ -155,36 +154,7 @@ def eval_log(eval_loss, eval_acc, epoch, log_wandb: bool):
 def main():
     model_args, training_args = parse_args()
 
-    # https://github.com/kuangliu/pytorch-cifar/blob/master/main.py
-    transform_train = transforms.Compose(
-        [
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
-        ]
-    )
-
-    transform_test = transforms.Compose(
-        [
-            transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
-        ]
-    )
-
-    trainset = torchvision.datasets.CIFAR10(
-        root="./data", train=True, download=True, transform=transform_train
-    )
-    trainloader = torch.utils.data.DataLoader(
-        trainset, batch_size=training_args.batch_size, shuffle=False, num_workers=2
-    )
-
-    testset = torchvision.datasets.CIFAR10(
-        root="./data", train=False, download=True, transform=transform_test
-    )
-    testloader = torch.utils.data.DataLoader(
-        testset, batch_size=training_args.eval_batch_size, shuffle=False, num_workers=2
-    )
+    trainloader, testloader = load_data(training_args)
 
     model = build_model(model_args)
 

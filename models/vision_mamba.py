@@ -6,13 +6,13 @@ from mamba_ssm import Mamba
 
 
 class Block(nn.Module):
-    def __init__(self, dim: int, ss_drop: float = 0.0):
+    def __init__(self, dim: int, ssm_drop: float = 0.0):
         super().__init__()
         self.mamba = Mamba(
             d_model=dim,
         )
         self.norm = nn.LayerNorm(dim)
-        self.dropout = nn.Dropout(ss_drop)
+        self.dropout = nn.Dropout(ssm_drop)
 
     def forward(self, x, residual=None):
         residual = (x + residual) if residual is not None else x
@@ -42,13 +42,13 @@ class PatchEmbedding(nn.Module):
 
 
 class MambaBackbone(nn.Module):
-    def __init__(self, n_layers: int, dim: int, ss_drop: float = 0.0):
+    def __init__(self, n_layers: int, dim: int, ssm_drop: float = 0.0):
         super().__init__()
         self.blocks = nn.ModuleList(
             [
                 Block(
                     dim=dim,
-                    ss_drop=ss_drop,
+                    ssm_drop=ssm_drop,
                 )
                 for _ in range(n_layers)
             ]
@@ -73,7 +73,7 @@ class VisionMamba(nn.Module):
         n_layers: int,
         n_classes: int,
         channels: int = 3,
-        ss_drop: float = 0.0,
+        ssm_drop: float = 0.0,
     ):
         super().__init__()
         assert (
@@ -85,7 +85,7 @@ class VisionMamba(nn.Module):
             height, width, self.patch_size, dim, channels
         )
 
-        self.backbone = MambaBackbone(n_layers, dim, ss_drop)
+        self.backbone = MambaBackbone(n_layers, dim, ssm_drop)
         self.norm = nn.LayerNorm(dim)
         self.cls_token = nn.Parameter(torch.zeros(1, 1, dim), requires_grad=True)
         self.head = nn.Linear(dim, n_classes, bias=False)

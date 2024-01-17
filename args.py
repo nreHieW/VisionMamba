@@ -24,6 +24,9 @@ class ModelArgs:
     proj_drop: float = 0.0
     mlp_drop: float = 0.0
 
+    # Mamba
+    ssm_drop: float = 0.0
+
     # ResNet
     num_blocks: list = field(default_factory=lambda: [1, 1, 1, 1])
     block_fn: str = "residual"
@@ -45,6 +48,9 @@ class ModelArgs:
             base["width"] = self.width
             base["channels"] = self.channels
             base["bias"] = self.bias
+
+        if self.name == "mamba":
+            base["ssm_drop"] = self.ssm_drop
 
         if self.name == "vit":
             base["mlp_factor"] = self.mlp_factor
@@ -152,6 +158,8 @@ def parse_args() -> (ModelArgs, TrainingArgs):
     parser.add_argument("--n-heads", type=int, default=8)
     parser.add_argument("--mlp-factor", type=int, default=4)
     parser.add_argument("--channels", type=int, default=3)
+    parser.add_argument("--bias", action="store_true")
+    parser.add_argument("--ssm-drop", type=float, default=0.0)
     parser.add_argument("--attn-drop", type=float, default=0.0)
     parser.add_argument("--proj-drop", type=float, default=0.0)
     parser.add_argument("--mlp-drop", type=float, default=0.0)
@@ -196,6 +204,7 @@ def parse_args() -> (ModelArgs, TrainingArgs):
         n_layers=args.n_layers,
         n_heads=args.n_heads,
         mlp_factor=args.mlp_factor,
+        bias=args.bias,
         channels=args.channels,
         attn_drop=args.attn_drop,
         proj_drop=args.proj_drop,

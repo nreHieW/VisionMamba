@@ -16,6 +16,7 @@ def build_model(config):
             n_classes=config.num_classes,
             n_heads=config.n_heads,
             mlp_factor=config.mlp_factor,
+            bias=config.bias,
             channels=config.channels,
             attn_drop=config.attn_drop,
             proj_drop=config.proj_drop,

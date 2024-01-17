@@ -84,10 +84,13 @@ class Attention(nn.Module):
         dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
 
         attn = dots.softmax(dim=-1)
+        attn = self.attn_drop(attn)
 
         out = torch.matmul(attn, v)
         out = rearrange(out, "b h n d -> b n (h d)")
-        return self.to_out(out)
+        out = self.to_out(out)
+        out = self.proj_drop(out)
+        return out
 
 
 class Block(nn.Module):
@@ -264,3 +267,7 @@ def _check_impl():
     ), f"Model output does not match ref output. Max diff: {torch.max(torch.abs(ref_y - y))}"
 
     return 0
+
+
+if __name__ == "__main__":
+    _check_impl()

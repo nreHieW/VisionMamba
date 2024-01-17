@@ -30,8 +30,6 @@ def build_model(config):
             dim=config.dim,
             n_layers=config.n_layers,
             n_classes=config.num_classes,
-            n_heads=config.n_heads,
-            mlp_factor=config.mlp_factor,
             channels=config.channels,
         )
     elif config.name == "resnet":

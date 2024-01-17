@@ -50,3 +50,5 @@ def load_data(training_args):
     testloader = torch.utils.data.DataLoader(
         testset, batch_size=training_args.eval_batch_size, shuffle=False, num_workers=2
     )
+
+    return trainloader, testloader

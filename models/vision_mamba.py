@@ -5,7 +5,7 @@ from einops.layers.torch import Rearrange
 from mamba_ssm import Mamba
 
 
-class Block(nn.Module):
+class BasicBlock(nn.Module):
     def __init__(self, dim: int, ssm_drop: float = 0.0):
         super().__init__()
         self.mamba = Mamba(
@@ -41,12 +41,70 @@ class PatchEmbedding(nn.Module):
         return out
 
 
-class MambaBackbone(nn.Module):
-    def __init__(self, n_layers: int, dim: int, ssm_drop: float = 0.0):
+class BiDirectionalConcatBlock(nn.Module):
+    def __init__(self, dim: int, ssm_drop: float = 0.0) -> None:
         super().__init__()
+        self.out_dim = dim
+        self.dim = dim // 2
+        self.mamba1 = Mamba(
+            d_model=self.dim,
+        )
+        self.mamba2 = Mamba(
+            d_model=self.dim,
+        )
+        self.norm = nn.LayerNorm(self.out_dim)
+        self.dropout = nn.Dropout(ssm_drop)
+
+    def forward(self, x, residual=None):
+        residual = (x + residual) if residual is not None else x
+        x = self.norm(x)
+        rev_input = torch.flip(x, dims=[1])
+        hidden_states1 = self.mamba1(x)
+        hidden_states2 = self.mamba2(rev_input)
+        hidden_states = torch.cat((hidden_states1, hidden_states2), dim=-1)
+        hidden_states = self.dropout(hidden_states)
+        return hidden_states, residual
+
+
+class BiDirectionalAddBlock(nn.Module):
+    def __init__(self, dim: int, ssm_drop: float = 0.0) -> None:
+        super().__init__()
+        self.out_dim = dim
+        self.dim = dim // 2
+        self.mamba1 = Mamba(
+            d_model=self.dim,
+        )
+        self.mamba2 = Mamba(
+            d_model=self.dim,
+        )
+        self.norm = nn.LayerNorm(self.out_dim)
+        self.dropout = nn.Dropout(ssm_drop)
+
+    def forward(self, x, residual=None):
+        residual = (x + residual) if residual is not None else x
+        x = self.norm(x)
+        rev_input = torch.flip(x, dims=[1])
+        hidden_states1 = self.mamba1(x)
+        hidden_states2 = self.mamba2(rev_input)
+        hidden_states = hidden_states1 + hidden_states2
+        hidden_states = self.dropout(hidden_states)
+        return hidden_states, residual
+
+
+class MambaBackbone(nn.Module):
+    def __init__(self, n_layers: int, dim: int, block_type: str, ssm_drop: float = 0.0):
+        super().__init__()
+        if block_type == "basic":
+            block_fn = BasicBlock
+        elif block_type == "bi_concat":
+            block_fn = BiDirectionalConcatBlock
+        elif block_type == "bi_add":
+            block_fn = BiDirectionalAddBlock
+        else:
+            raise NotImplementedError(f"Block {block_type} not implemented")
         self.blocks = nn.ModuleList(
             [
-                Block(
+                block_fn(
                     dim=dim,
                     ssm_drop=ssm_drop,
                 )

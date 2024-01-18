@@ -6,6 +6,8 @@ import torch
 @dataclass
 class ModelArgs:
     name: str
+    # Mamba and ResNet
+    block_fn: str = "residual"
     num_classes: int = 10
 
     # Vit and Mamba
@@ -29,7 +31,6 @@ class ModelArgs:
 
     # ResNet
     num_blocks: list = field(default_factory=lambda: [1, 1, 1, 1])
-    block_fn: str = "residual"
     dimensions: list = field(default_factory=lambda: [64, 128, 256, 512])
     first_kernel_size: int = 3
     identity_method: str = "B"
@@ -61,10 +62,12 @@ class ModelArgs:
 
         if self.name == "resnet":
             base["num_blocks"] = self.num_blocks
-            base["block_fn"] = self.block_fn
             base["dimensions"] = self.dimensions
             base["first_kernel_size"] = self.first_kernel_size
             base["identity_method"] = self.identity_method
+
+        if self.name == "resnet" or self.name == "mamba":
+            base["block_fn"] = self.block_fn
 
         return base
 
@@ -91,6 +94,11 @@ class ModelArgs:
             base_str += f"First kernel size: {self.first_kernel_size}\n\t"
             base_str += f"Identity method: {self.identity_method}\n\t"
 
+        if self.name == "mamba":
+            base_str += f"SSM drop: {self.ssm_drop}\n\t"
+
+        if self.name == "resnet" or self.name == "mamba":
+            base_str += f"Block fn: {self.block_fn}\n\t"
         return base_str
 
 
@@ -166,7 +174,7 @@ def parse_args() -> (ModelArgs, TrainingArgs):
     parser.add_argument("--proj-drop", type=float, default=0.0)
     parser.add_argument("--mlp-drop", type=float, default=0.0)
     parser.add_argument("--num-blocks", nargs="+", type=int, default=[1, 1, 1, 1])
-    parser.add_argument("--block-fn", type=str, default="residual")
+    parser.add_argument("--block-fn", type=str, default="")
     parser.add_argument(
         "--dimensions", nargs="+", type=int, default=[64, 128, 256, 512]
     )

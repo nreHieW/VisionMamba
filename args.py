@@ -230,6 +230,7 @@ def parse_args() -> (ModelArgs, TrainingArgs):
         dimensions=args.dimensions,
         first_kernel_size=args.first_kernel_size,
         identity_method=args.identity_method,
+        use_pos_emb=args.use_pos_emb,
     )
 
     training_args = TrainingArgs(

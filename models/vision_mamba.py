@@ -57,10 +57,10 @@ class BiDirectionalConcatBlock(nn.Module):
 
     def forward(self, x, residual=None):
         residual = (x + residual) if residual is not None else x
-        x = self.norm(x)
-        rev_input = torch.flip(x, dims=[1])
-        hidden_states1 = self.mamba1(x)
-        hidden_states2 = self.mamba2(rev_input)
+        forward, backward = torch.split(x, self.dim, dim=-1)
+        reverse_input = torch.flip(backward, dims=[1])
+        hidden_states1 = self.mamba1(forward)
+        hidden_states2 = self.mamba2(reverse_input)
         hidden_states = torch.cat((hidden_states1, hidden_states2), dim=-1)
         hidden_states = self.dropout(hidden_states)
         return hidden_states, residual
@@ -69,15 +69,14 @@ class BiDirectionalConcatBlock(nn.Module):
 class BiDirectionalAddBlock(nn.Module):
     def __init__(self, dim: int, ssm_drop: float = 0.0) -> None:
         super().__init__()
-        self.out_dim = dim
-        self.dim = dim // 2
+        self.dim = dim
         self.mamba1 = Mamba(
             d_model=self.dim,
         )
         self.mamba2 = Mamba(
             d_model=self.dim,
         )
-        self.norm = nn.LayerNorm(self.out_dim)
+        self.norm = nn.LayerNorm(self.dim)
         self.dropout = nn.Dropout(ssm_drop)
 
     def forward(self, x, residual=None):
@@ -161,6 +160,3 @@ class VisionMamba(nn.Module):
         pred = self.head(cls_token_end)
 
         return pred
-
-    def count_parameters(self):
-        return sum(p.numel() for p in self.parameters() if p.requires_grad)

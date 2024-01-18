@@ -130,6 +130,7 @@ class VisionMamba(nn.Module):
         dim: int,
         n_layers: int,
         n_classes: int,
+        block_type: str,
         channels: int = 3,
         ssm_drop: float = 0.0,
     ):
@@ -143,7 +144,7 @@ class VisionMamba(nn.Module):
             height, width, self.patch_size, dim, channels
         )
 
-        self.backbone = MambaBackbone(n_layers, dim, ssm_drop)
+        self.backbone = MambaBackbone(n_layers, dim, block_type, ssm_drop)
         self.norm = nn.LayerNorm(dim)
         self.cls_token = nn.Parameter(torch.zeros(1, 1, dim), requires_grad=True)
         self.head = nn.Linear(dim, n_classes, bias=False)

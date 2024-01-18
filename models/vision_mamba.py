@@ -130,6 +130,7 @@ class VisionMamba(nn.Module):
         n_layers: int,
         n_classes: int,
         block_type: str,
+        pos_emb: bool,
         channels: int = 3,
         ssm_drop: float = 0.0,
     ):
@@ -147,12 +148,18 @@ class VisionMamba(nn.Module):
         self.norm = nn.LayerNorm(dim)
         self.cls_token = nn.Parameter(torch.zeros(1, 1, dim), requires_grad=True)
         self.head = nn.Linear(dim, n_classes, bias=False)
+        self.n_patches = (height // patch_size) * (width // patch_size)
+        self.use_pos_emb = pos_emb
+        if pos_emb:
+            self.pos_embed = nn.Parameter(torch.zeros(1, self.n_patches + 1, dim))
 
     def forward(self, x):
         b_size = x.shape[0]
         x = self.to_patch_embedding(x)
         cls_token = self.cls_token.expand(b_size, -1, -1)
         x = torch.cat((x, cls_token), dim=1)
+        if self.use_pos_emb:
+            x = x + self.pos_embed
 
         x = self.backbone(x)
 

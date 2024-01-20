@@ -74,7 +74,7 @@ def train(
         for batch_idx, (inputs, targets) in enumerate(trainloader, 1):
             inputs, targets = inputs.to(
                 device=train_args.device, dtype=torch_dtype
-            ), targets.to("cuda")
+            ), targets.to(device=train_args.device)
             optimizer.zero_grad()
 
             if train_args.mixed_precision:
@@ -107,7 +107,7 @@ def train(
             for eval_batch, (inputs, targets) in enumerate(testloader):
                 inputs, targets = inputs.to(
                     device=train_args.device, dtype=torch_dtype
-                ), targets.to("cuda")
+                ), targets.to(device=train_args.device)
                 y = model(inputs)
                 loss = ce_loss(y.float(), targets)
                 eval_loss.append(loss.item())

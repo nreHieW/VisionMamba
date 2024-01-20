@@ -6,6 +6,13 @@ from mamba_ssm import Mamba
 
 
 class BasicBlock(nn.Module):
+    """
+    Note:
+    In the original paper, the authors used Add -> LN -> Mixer (Mamba) for performance reasons because they fuse the
+    Add and LN operations into a single operation. However, I didn't find any performance speedups. So for this implementation,
+    I follow standard VIT implementation and use LN -> Mixer (Mamba) -> Add
+    """
+
     def __init__(self, dim: int, ssm_drop: float = 0.0):
         super().__init__()
         self.mamba = Mamba(
@@ -14,12 +21,12 @@ class BasicBlock(nn.Module):
         self.norm = nn.LayerNorm(dim)
         self.dropout = nn.Dropout(ssm_drop)
 
-    def forward(self, x, residual=None):
-        residual = (x + residual) if residual is not None else x
-        x = self.norm(x)
-        hidden_states = self.mamba(x)
+    def forward(self, x):
+        hidden_states = self.norm(x)
+        hidden_states = self.mamba(hidden_states)
+        hidden_states = hidden_states + x
         hidden_states = self.dropout(hidden_states)
-        return hidden_states, residual
+        return hidden_states
 
 
 class PatchEmbedding(nn.Module):
@@ -54,16 +61,18 @@ class BiDirectionalConcatBlock(nn.Module):
         )
         self.norm = nn.LayerNorm(self.out_dim)
         self.dropout = nn.Dropout(ssm_drop)
+        self.act = nn.GELU()
 
-    def forward(self, x, residual=None):
-        residual = (x + residual) if residual is not None else x
-        forward, backward = torch.split(x, self.dim, dim=-1)
-        reverse_input = torch.flip(backward, dims=[1])
-        hidden_states1 = self.mamba1(forward)
-        hidden_states2 = self.mamba2(reverse_input)
-        hidden_states = torch.cat((hidden_states1, hidden_states2), dim=-1)
+    def forward(self, x):
+        hidden_states = self.norm(x)
+        rev_input = torch.flip(hidden_states, dims=[1])
+        forward_states = self.mamba1(hidden_states)
+        backward_states = self.mamba2(rev_input)
+        hidden_states = torch.cat([forward_states, backward_states], dim=-1)
+        hidden_states = hidden_states + x
+        hidden_states = self.act(hidden_states)
         hidden_states = self.dropout(hidden_states)
-        return hidden_states, residual
+        return hidden_states
 
 
 class BiDirectionalAddBlock(nn.Module):
@@ -78,16 +87,18 @@ class BiDirectionalAddBlock(nn.Module):
         )
         self.norm = nn.LayerNorm(self.dim)
         self.dropout = nn.Dropout(ssm_drop)
+        self.act = nn.GELU()
 
-    def forward(self, x, residual=None):
-        residual = (x + residual) if residual is not None else x
-        x = self.norm(x)
-        rev_input = torch.flip(x, dims=[1])
-        hidden_states1 = self.mamba1(x)
-        hidden_states2 = self.mamba2(rev_input)
-        hidden_states = hidden_states1 + hidden_states2
+    def forward(self, x):
+        hidden_states = self.norm(x)
+        rev_input = torch.flip(hidden_states, dims=[1])
+        forward_states = self.mamba1(hidden_states)
+        backward_states = self.mamba2(rev_input)
+        hidden_states = forward_states + backward_states
+        hidden_states = hidden_states + x
+        hidden_states = self.act(hidden_states)
         hidden_states = self.dropout(hidden_states)
-        return hidden_states, residual
+        return hidden_states
 
 
 class MambaBackbone(nn.Module):
@@ -113,10 +124,8 @@ class MambaBackbone(nn.Module):
         self.norm = nn.LayerNorm(dim)
 
     def forward(self, x):
-        residual = None
         for block in self.blocks:
-            x, residual = block(x, residual)
-        x = (x + residual) if residual is not None else x
+            x = block(x)
         return self.norm(x)
 
 
@@ -162,7 +171,7 @@ class VisionMamba(nn.Module):
             x = x + self.pos_embed
 
         x = self.backbone(x)
-
+        x = self.norm(x)
         cls_token_end = x[:, -1]
         pred = self.head(cls_token_end)
 

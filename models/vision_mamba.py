@@ -101,8 +101,66 @@ class BiDirectionalAddBlock(nn.Module):
         return hidden_states
 
 
+class FeedForward(nn.Module):
+    """
+    Implements the Feed Forward Layer
+
+    Args:
+        dim: Dimension of the input and output
+        hidden_dim: Dimension of the hidden layer
+    """
+
+    def __init__(self, dim, hidden_dim, drop=0.0):
+        super().__init__()
+        self.ff1 = nn.Linear(dim, hidden_dim)
+        self.act = nn.GELU()
+        self.ff2 = nn.Linear(hidden_dim, dim)
+        self.drop = nn.Dropout(drop)
+        self.norm = nn.LayerNorm(dim)
+
+    def forward(self, x):
+        x = self.norm(x)
+        out = self.ff1(x)
+        out = self.act(out)
+        out = self.drop(out)
+        out = self.ff2(out)
+        out = self.drop(out)
+        return out
+
+
+class BiDirectionalAddFFBlock(nn.Module):
+    def __init__(self, dim: int, ssm_drop: float = 0.0, mlp_drop: float = 0.0) -> None:
+        super().__init__()
+        self.block = BiDirectionalAddBlock(dim, ssm_drop)
+        self.ff = FeedForward(dim, dim, mlp_drop)
+
+    def forward(self, x):
+        x = x + self.block(x)
+        x = x + self.ff(x)
+        return x
+
+
+class BiDirectionalConcatFFBlock(nn.Module):
+    def __init__(self, dim: int, ssm_drop: float = 0.0, mlp_drop: float = 0.0) -> None:
+        super().__init__()
+        self.block = BiDirectionalConcatBlock(dim, ssm_drop)
+        self.ff = FeedForward(dim, dim, mlp_drop)
+
+    def forward(self, x):
+        x = x + self.block(x)
+        x = x + self.ff(x)
+        return x
+
+
 class MambaBackbone(nn.Module):
-    def __init__(self, n_layers: int, dim: int, block_type: str, ssm_drop: float = 0.0):
+    def __init__(
+        self,
+        n_layers: int,
+        dim: int,
+        block_type: str,
+        ssm_drop: float = 0.0,
+        mlp_drop: float = 0.0,
+    ):
         super().__init__()
         if block_type == "basic":
             block_fn = BasicBlock
@@ -110,6 +168,10 @@ class MambaBackbone(nn.Module):
             block_fn = BiDirectionalConcatBlock
         elif block_type == "bi_add":
             block_fn = BiDirectionalAddBlock
+        elif block_type == "bi_concat_ff":
+            block_fn = BiDirectionalConcatFFBlock
+        elif block_type == "bi_add_ff":
+            block_fn = BiDirectionalAddFFBlock
         else:
             raise NotImplementedError(f"Block {block_type} not implemented")
         self.blocks = nn.ModuleList(
@@ -117,6 +179,7 @@ class MambaBackbone(nn.Module):
                 block_fn(
                     dim=dim,
                     ssm_drop=ssm_drop,
+                    mlp_drop=mlp_drop,
                 )
                 for _ in range(n_layers)
             ]
@@ -142,6 +205,7 @@ class VisionMamba(nn.Module):
         pos_emb: bool,
         channels: int = 3,
         ssm_drop: float = 0.0,
+        mlp_drop: float = 0.0,
     ):
         super().__init__()
         assert (
@@ -153,8 +217,7 @@ class VisionMamba(nn.Module):
             height, width, self.patch_size, dim, channels
         )
 
-        self.backbone = MambaBackbone(n_layers, dim, block_type, ssm_drop)
-        self.norm = nn.LayerNorm(dim)
+        self.backbone = MambaBackbone(n_layers, dim, block_type, ssm_drop, mlp_drop)
         self.cls_token = nn.Parameter(torch.zeros(1, 1, dim), requires_grad=True)
         self.head = nn.Linear(dim, n_classes, bias=False)
         self.n_patches = (height // patch_size) * (width // patch_size)
@@ -171,7 +234,6 @@ class VisionMamba(nn.Module):
             x = x + self.pos_embed
 
         x = self.backbone(x)
-        x = self.norm(x)
         cls_token_end = x[:, -1]
         pred = self.head(cls_token_end)
 

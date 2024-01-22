@@ -18,13 +18,13 @@ class ModelArgs:
     width: int = 32
     channels: int = 3
     bias: bool = True
+    mlp_drop: float = 0.0
 
     # ViT
     mlp_factor: int = 4
     n_heads: int = 8
     attn_drop: float = 0.0
     proj_drop: float = 0.0
-    mlp_drop: float = 0.0
 
     # Mamba
     ssm_drop: float = 0.0
@@ -50,6 +50,7 @@ class ModelArgs:
             base["width"] = self.width
             base["channels"] = self.channels
             base["bias"] = self.bias
+            base["mlp_drop"] = self.mlp_drop
 
         if self.name == "mamba":
             base["ssm_drop"] = self.ssm_drop
@@ -60,7 +61,6 @@ class ModelArgs:
             base["n_heads"] = self.n_heads
             base["attn_drop"] = self.attn_drop
             base["proj_drop"] = self.proj_drop
-            base["mlp_drop"] = self.mlp_drop
 
         if self.name == "resnet":
             base["num_blocks"] = self.num_blocks
@@ -83,12 +83,12 @@ class ModelArgs:
             base_str += f"Width: {self.width}\n\t"
             base_str += f"Channels: {self.channels}\n\t"
             base_str += f"Bias: {self.bias}\n\t"
+            base_str += f"MLP drop: {self.mlp_drop}\n\t"
         if self.name == "vit":
             base_str += f"MLP factor: {self.mlp_factor}\n\t"
             base_str += f"Num heads: {self.n_heads}\n\t"
             base_str += f"Attn drop: {self.attn_drop}\n\t"
             base_str += f"Proj drop: {self.proj_drop}\n\t"
-            base_str += f"MLP drop: {self.mlp_drop}\n\t"
         if self.name == "resnet":
             base_str += f"Num blocks: {self.num_blocks}\n\t"
             base_str += f"Block fn: {self.block_fn}\n\t"

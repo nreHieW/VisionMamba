@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 
+from functools import partial
 from einops.layers.torch import Rearrange
 from mamba_ssm import Mamba
 
@@ -129,10 +130,16 @@ class FeedForward(nn.Module):
 
 
 class BiDirectionalAddFFBlock(nn.Module):
-    def __init__(self, dim: int, ssm_drop: float = 0.0, mlp_drop: float = 0.0) -> None:
+    def __init__(
+        self,
+        dim: int,
+        ssm_drop: float = 0.0,
+        mlp_drop: float = 0.0,
+        mlp_factor: int = 4,
+    ) -> None:
         super().__init__()
         self.block = BiDirectionalAddBlock(dim, ssm_drop)
-        self.ff = FeedForward(dim, dim, mlp_drop)
+        self.ff = FeedForward(dim, dim * mlp_factor, mlp_drop)
 
     def forward(self, x):
         x = x + self.block(x)
@@ -141,10 +148,16 @@ class BiDirectionalAddFFBlock(nn.Module):
 
 
 class BiDirectionalConcatFFBlock(nn.Module):
-    def __init__(self, dim: int, ssm_drop: float = 0.0, mlp_drop: float = 0.0) -> None:
+    def __init__(
+        self,
+        dim: int,
+        ssm_drop: float = 0.0,
+        mlp_drop: float = 0.0,
+        mlp_factor: int = 4,
+    ) -> None:
         super().__init__()
         self.block = BiDirectionalConcatBlock(dim, ssm_drop)
-        self.ff = FeedForward(dim, dim, mlp_drop)
+        self.ff = FeedForward(dim, dim * mlp_factor, mlp_drop)
 
     def forward(self, x):
         x = x + self.block(x)
@@ -159,6 +172,7 @@ class MambaBackbone(nn.Module):
         dim: int,
         block_type: str,
         ssm_drop: float = 0.0,
+        mlp_factor: int = 4,
         mlp_drop: float = 0.0,
     ):
         super().__init__()
@@ -169,9 +183,13 @@ class MambaBackbone(nn.Module):
         elif block_type == "bi_add":
             block_fn = BiDirectionalAddBlock
         elif block_type == "bi_concat_ff":
-            block_fn = BiDirectionalConcatFFBlock
+            block_fn = partial(
+                BiDirectionalConcatFFBlock, mlp_drop=mlp_drop, mlp_factor=mlp_factor
+            )
         elif block_type == "bi_add_ff":
-            block_fn = BiDirectionalAddFFBlock
+            block_fn = partial(
+                BiDirectionalAddFFBlock, mlp_drop=mlp_drop, mlp_factor=mlp_factor
+            )
         else:
             raise NotImplementedError(f"Block {block_type} not implemented")
         self.blocks = nn.ModuleList(
@@ -179,7 +197,6 @@ class MambaBackbone(nn.Module):
                 block_fn(
                     dim=dim,
                     ssm_drop=ssm_drop,
-                    mlp_drop=mlp_drop,
                 )
                 for _ in range(n_layers)
             ]

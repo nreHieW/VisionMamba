@@ -29,6 +29,7 @@ class ModelArgs:
     # Mamba
     ssm_drop: float = 0.0
     use_pos_emb: bool = False
+    drop_path: float = 0.0
 
     # ResNet
     num_blocks: list = field(default_factory=lambda: [1, 1, 1, 1])
@@ -55,6 +56,7 @@ class ModelArgs:
         if self.name == "mamba":
             base["ssm_drop"] = self.ssm_drop
             base["use_pos_emb"] = self.use_pos_emb
+            base["drop_path"] = self.drop_path
 
         if self.name == "vit":
             base["mlp_factor"] = self.mlp_factor
@@ -99,6 +101,7 @@ class ModelArgs:
         if self.name == "mamba":
             base_str += f"SSM drop: {self.ssm_drop}\n\t"
             base_str += f"Use pos emb: {self.use_pos_emb}\n\t"
+            base_str += f"Drop path: {self.drop_path}\n\t"
 
         if self.name == "resnet" or self.name == "mamba":
             base_str += f"Block fn: {self.block_fn}\n\t"
@@ -173,6 +176,7 @@ def parse_args() -> (ModelArgs, TrainingArgs):
     parser.add_argument("--channels", type=int, default=3)
     parser.add_argument("--bias", action="store_true")
     parser.add_argument("--ssm-drop", type=float, default=0.0)
+    parser.add_argument("--drop-path", type=float, default=0.0)
     parser.add_argument("--use-pos-emb", action="store_true")
     parser.add_argument("--attn-drop", type=float, default=0.0)
     parser.add_argument("--proj-drop", type=float, default=0.0)
@@ -231,6 +235,7 @@ def parse_args() -> (ModelArgs, TrainingArgs):
         first_kernel_size=args.first_kernel_size,
         identity_method=args.identity_method,
         use_pos_emb=args.use_pos_emb,
+        drop_path=args.drop_path,
     )
 
     training_args = TrainingArgs(

@@ -36,6 +36,7 @@ def build_model(config):
             ssm_drop=config.ssm_drop,
             mlp_drop=config.mlp_drop,
             mlp_factor=config.mlp_factor,
+            drop_path=config.drop_path,
         )
     elif config.name == "resnet":
         model = ResNet(

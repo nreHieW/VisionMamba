@@ -4,6 +4,7 @@ import torch.nn as nn
 from functools import partial
 from einops.layers.torch import Rearrange
 from mamba_ssm import Mamba
+from timm.models.layers import DropPath
 
 
 class BasicBlock(nn.Module):
@@ -14,19 +15,21 @@ class BasicBlock(nn.Module):
     I follow standard VIT implementation and use LN -> Mixer (Mamba) -> Add
     """
 
-    def __init__(self, dim: int, ssm_drop: float = 0.0):
+    def __init__(self, dim: int, ssm_drop: float = 0.0, drop_path: float = 0.0) -> None:
         super().__init__()
         self.mamba = Mamba(
             d_model=dim,
         )
         self.norm = nn.LayerNorm(dim)
         self.dropout = nn.Dropout(ssm_drop)
+        self.drop_path = DropPath(drop_path)
 
     def forward(self, x):
         hidden_states = self.norm(x)
         hidden_states = self.mamba(hidden_states)
-        hidden_states = hidden_states + x
         hidden_states = self.dropout(hidden_states)
+        hidden_states = hidden_states + x
+        hidden_states = self.drop_path(hidden_states)
         return hidden_states
 
 
@@ -50,7 +53,7 @@ class PatchEmbedding(nn.Module):
 
 
 class BiDirectionalConcatBlock(nn.Module):
-    def __init__(self, dim: int, ssm_drop: float = 0.0) -> None:
+    def __init__(self, dim: int, ssm_drop: float = 0.0, drop_path: float = 0.0) -> None:
         super().__init__()
         self.out_dim = dim
         self.dim = dim // 2
@@ -63,6 +66,7 @@ class BiDirectionalConcatBlock(nn.Module):
         self.norm = nn.LayerNorm(self.out_dim)
         self.dropout = nn.Dropout(ssm_drop)
         self.act = nn.GELU()
+        self.drop_path = DropPath(drop_path)
 
     def forward(self, x):
         hidden_states = self.norm(x)
@@ -70,6 +74,7 @@ class BiDirectionalConcatBlock(nn.Module):
         forward_states = self.mamba1(hidden_states)
         backward_states = self.mamba2(rev_input)
         hidden_states = torch.cat([forward_states, backward_states], dim=-1)
+        hidden_states = self.drop_path(hidden_states)
         hidden_states = hidden_states + x
         hidden_states = self.act(hidden_states)
         hidden_states = self.dropout(hidden_states)
@@ -77,7 +82,7 @@ class BiDirectionalConcatBlock(nn.Module):
 
 
 class BiDirectionalAddBlock(nn.Module):
-    def __init__(self, dim: int, ssm_drop: float = 0.0) -> None:
+    def __init__(self, dim: int, ssm_drop: float = 0.0, drop_path: float = 0.0) -> None:
         super().__init__()
         self.dim = dim
         self.mamba1 = Mamba(
@@ -89,6 +94,7 @@ class BiDirectionalAddBlock(nn.Module):
         self.norm = nn.LayerNorm(self.dim)
         self.dropout = nn.Dropout(ssm_drop)
         self.act = nn.GELU()
+        self.drop_path = DropPath(drop_path)
 
     def forward(self, x):
         hidden_states = self.norm(x)
@@ -96,6 +102,7 @@ class BiDirectionalAddBlock(nn.Module):
         forward_states = self.mamba1(hidden_states)
         backward_states = self.mamba2(rev_input)
         hidden_states = forward_states + backward_states
+        hidden_states = self.drop_path(hidden_states)
         hidden_states = hidden_states + x
         hidden_states = self.act(hidden_states)
         hidden_states = self.dropout(hidden_states)
@@ -135,10 +142,11 @@ class BiDirectionalAddFFBlock(nn.Module):
         dim: int,
         ssm_drop: float = 0.0,
         mlp_drop: float = 0.0,
+        drop_path: float = 0.0,
         mlp_factor: int = 4,
     ) -> None:
         super().__init__()
-        self.block = BiDirectionalAddBlock(dim, ssm_drop)
+        self.block = BiDirectionalAddBlock(dim, ssm_drop, drop_path)
         self.ff = FeedForward(dim, dim * mlp_factor, mlp_drop)
 
     def forward(self, x):
@@ -153,10 +161,11 @@ class BiDirectionalConcatFFBlock(nn.Module):
         dim: int,
         ssm_drop: float = 0.0,
         mlp_drop: float = 0.0,
+        drop_path: float = 0.0,
         mlp_factor: int = 4,
     ) -> None:
         super().__init__()
-        self.block = BiDirectionalConcatBlock(dim, ssm_drop)
+        self.block = BiDirectionalConcatBlock(dim, ssm_drop, drop_path)
         self.ff = FeedForward(dim, dim * mlp_factor, mlp_drop)
 
     def forward(self, x):
@@ -174,6 +183,7 @@ class MambaBackbone(nn.Module):
         ssm_drop: float = 0.0,
         mlp_factor: int = 4,
         mlp_drop: float = 0.0,
+        drop_path: float = 0.0,
     ):
         super().__init__()
         if block_type == "basic":
@@ -197,6 +207,7 @@ class MambaBackbone(nn.Module):
                 block_fn(
                     dim=dim,
                     ssm_drop=ssm_drop,
+                    drop_path=drop_path,
                 )
                 for _ in range(n_layers)
             ]
@@ -236,7 +247,7 @@ class VisionMamba(nn.Module):
         )
 
         self.backbone = MambaBackbone(
-            n_layers, dim, block_type, ssm_drop, mlp_drop, mlp_factor
+            n_layers, dim, block_type, ssm_drop, mlp_factor, mlp_drop
         )
         self.cls_token = nn.Parameter(torch.zeros(1, 1, dim), requires_grad=True)
         self.head = nn.Linear(dim, n_classes, bias=False)

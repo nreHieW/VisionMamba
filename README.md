@@ -1,3 +1,4 @@
+# VisionMamba
 Exploring the use of [Mamba](https://github.com/state-spaces/mamba/tree/main) for Image Classification on CIFAR10
 This repository provides implementations of various models for image classification on CIFAR10 using Mamba. The models are trained using the CIFAR10 dataset and the performance is evaluated on the test set. 
 

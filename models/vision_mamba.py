@@ -235,6 +235,7 @@ class VisionMamba(nn.Module):
         ssm_drop: float = 0.0,
         mlp_drop: float = 0.0,
         mlp_factor: int = 4,
+        drop_path: float = 0.0,
     ):
         super().__init__()
         assert (
@@ -247,10 +248,10 @@ class VisionMamba(nn.Module):
         )
 
         self.backbone = MambaBackbone(
-            n_layers, dim, block_type, ssm_drop, mlp_factor, mlp_drop
+            n_layers, dim, block_type, ssm_drop, mlp_factor, mlp_drop, drop_path
         )
         self.cls_token = nn.Parameter(torch.zeros(1, 1, dim), requires_grad=True)
-        self.head = nn.Linear(dim, n_classes, bias=False)
+        self.head = nn.Linear(dim, n_classes)
         self.n_patches = (height // patch_size) * (width // patch_size)
         self.use_pos_emb = pos_emb
         if pos_emb:
